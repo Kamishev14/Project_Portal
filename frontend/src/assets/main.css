@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased;
+    background-color: #0d0d0d;
+    color: #e5e5e5;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  /* ── Buttons ─────────────────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-semibold rounded-md
+           transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed;
+    background-color: #22c55e;
+    color: #0d0d0d;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: #16a34a;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md
+           transition-all duration-150 disabled:opacity-40;
+    background-color: #1a1a1a;
+    color: #a3a3a3;
+    border: 1px solid #2a2a2a;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background-color: #222;
+    color: #e5e5e5;
+    border-color: #3a3a3a;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-semibold rounded-md
+           transition-all duration-150 disabled:opacity-40;
+    background-color: #dc2626;
+    color: #fff;
+  }
+  .btn-danger:hover:not(:disabled) { background-color: #b91c1c; }
+
+  /* ── Inputs ──────────────────────────────────────────────── */
+  .input {
+    @apply block w-full px-3 py-2.5 text-sm rounded-md transition-all duration-150;
+    background-color: #111;
+    color: #e5e5e5;
+    border: 1px solid #2a2a2a;
+    outline: none;
+  }
+  .input::placeholder { color: #555; }
+  .input:focus {
+    border-color: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.15);
+  }
+
+  /* ── Cards ───────────────────────────────────────────────── */
+  .card {
+    @apply rounded-lg p-6;
+    background-color: #141414;
+    border: 1px solid #222;
+  }
+
+  /* ── Status badges ───────────────────────────────────────── */
+  .badge-pending  { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium; background:#2a1f00; color:#f59e0b; }
+  .badge-approved { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium; background:#052e16; color:#22c55e; }
+  .badge-declined { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium; background:#2d0000; color:#f87171; }
+  .badge-revision { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium; background:#0c1a3a; color:#60a5fa; }
+}

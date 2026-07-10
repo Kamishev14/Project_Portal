@@ -1,0 +1,14 @@
+package com.uni.projecthub;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
+
+@SpringBootApplication
+@EnableAsync
+public class ProjectHubApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ProjectHubApplication.class, args);
+    }
+}

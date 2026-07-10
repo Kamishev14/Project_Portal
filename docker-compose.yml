@@ -1,0 +1,36 @@
+version: '3.9'
+
+services:
+
+  # ── PostgreSQL database ────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: projecthub-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       projecthub
+      POSTGRES_USER:     projecthub
+      POSTGRES_PASSWORD: projecthub123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U projecthub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MailHog — fake SMTP server with a web UI ───────────────────────────────
+  # No real emails are sent. Visit http://localhost:8025 to read all "sent" emails.
+  # Free, works offline, no Google account needed.
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: projecthub-mail
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP — Spring Boot sends here
+      - "8025:8025"   # Web UI — you read emails here in the browser
+
+volumes:
+  postgres_data:
