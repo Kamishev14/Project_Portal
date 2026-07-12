@@ -1,170 +1,121 @@
-# ProjectHub — University Project Submission System
+# ФИНКИ Проекти Хаб
+
+University project submission system for FINKI students and professors.
+
+---
 
 ## Tech Stack
-- **Backend:** Spring Boot 3, Java 17, Spring Security + JWT, Spring Data JPA, Flyway
-- **Frontend:** Vue 3, Pinia, Vue Router, Axios, Tailwind CSS
-- **Database:** PostgreSQL (via Docker)
-- **Email (dev):** MailHog — a fake SMTP server, no real emails, no Google account needed
-- **Queue:** QRQ.app — free QR-based queue display
+
+| Layer | Tech |
+|---|---|
+| Backend | Spring Boot 4, Java 21, Spring Security + JWT, Spring Data JPA, Flyway |
+| Frontend | Vue 3, Pinia, Vue Router, Axios, Tailwind CSS |
+| Database | PostgreSQL (via Docker) |
+| Email (dev) | MailHog — fake local SMTP, no account needed |
+| Queue | QRQ.app — free QR-based queue tracker |
 
 ---
 
 ## Quick Start
 
 ### 1. Start the database and mail server
-You need Docker Desktop installed. Then run:
+
+You need Docker Desktop installed. Open a terminal in the **root `projecthub/` folder** (not `backend/`) and run:
+
 ```bash
-cd projecthub
 docker-compose up -d
 ```
-This starts two things:
-- PostgreSQL on port 5432
-- MailHog on port 8025 (open http://localhost:8025 to see "sent" emails)
+
+> ⚠️ **Important:** always run this from the root folder where `docker-compose.yml` lives.
+> If you run it from `backend/` by mistake, Docker creates a different database with wrong credentials and the backend won't connect.
+
+This starts:
+- PostgreSQL on port **5433** (5433 because port 5432 is taken by a local PostgreSQL install)
+- MailHog on port **8025** — open `http://localhost:8025` to see sent emails
+
+Verify it's working:
+```bash
+docker exec -it projecthub-db psql -U projecthub -d projecthub -c "SELECT 1;"
+```
+Must print `1 row` before starting the backend.
 
 ### 2. Start the backend
-Open the `backend/` folder in IntelliJ IDEA.
 
-**Finding application.yml in IntelliJ:**
-Go to `src → main → resources → application.yml`. If you don't see it, make sure the `resources` folder is marked as a Resources Root: right-click it → "Mark Directory as" → "Resources Root".
+Open IntelliJ IDEA → **File → Open** → navigate to `projecthub/backend/` → click on `pom.xml` → **Open as Project**.
 
-**Run:** Click the green play button next to `ProjectHubApplication.java`.
+> **SDK:** Must be Java 21. Go to File → Project Structure → Project → SDK and select Java 21.
+> Download from https://adoptium.net if not installed (Temurin 21).
 
-Flyway will automatically run your SQL files and create all tables on first start.
+Click the green run button next to `ProjectHubApplication.java`. Flyway runs all SQL migrations automatically on first start.
 
 ### 3. Start the frontend
+
+Open a terminal (either VS Code or IntelliJ's built-in terminal):
+
 ```bash
 cd frontend
-npm install
+npm install   # first time only
 npm run dev
 ```
-Open http://localhost:5173
+
+Open `http://localhost:5173`
 
 ---
 
-## Understanding the Architecture
+## Registration & Roles
 
-### Service Layers Explained
+Roles are assigned **automatically from the email domain** — no manual setup needed:
 
-The project has three layers of services — here's what each one does:
+| Email domain | Role |
+|---|---|
+| `@students.finki.ukim.mk` | Student |
+| `@finki.ukim.mk` | Professor |
 
-#### 1. Domain Service (`domain/service/`)
-- Contains **pure business rules** — no database, no emails, no HTTP
-- Example: "a project cannot go from APPROVED back to REVISION_REQUESTED"
-- Example: "only the student who owns the project can view it"
-- These rules would be the same even if you switched from Spring Boot to something else
-- `ProjectDomainService` / `ProjectDomainServiceImpl`
+Any other domain is rejected. Students must also provide their 6-digit university index (e.g. `190042`) — the first 2 digits are the enrollment year.
 
-#### 2. Application Service (`service/`)
-- **Coordinates** a use case end to end
-- Loads entities from repositories, calls domain services for rules, fires events
-- Does NOT contain business rules itself
-- Does NOT send emails itself — it fires an event and lets the listener handle that
-- `ProjectApplicationService` (interface) / `ProjectApplicationServiceImpl`
-- Using an **interface** here is important — the controller depends on the interface, not the
-  implementation. This means you could swap the implementation (e.g. for testing) without
-  changing the controller at all.
-
-#### 3. Infrastructure Service (`service/EmailService.java`)
-- Handles technical concerns — sending actual emails via SMTP
-- Called by the event listener, not directly by application services
+> **To test as a professor:** register with any `name@finki.ukim.mk` email. No index needed.
 
 ---
 
-### Events and Listeners Explained
+## Features
 
-This is the pattern your uni taught. Here's a plain explanation:
+### Student
+- Register with student index — role assigned automatically from email domain
+- Submit project ideas with title and description
+- Queue number assigned on submission (#1001, #1002...)
+- QR code generated linking to QRQ queue tracker
+- View all own projects and their current status
+- Edit or delete projects while status is PENDING or REVISION_REQUESTED
+- Resubmit after professor requests revision
+- See queue position — how many projects are ahead in the queue
+- Email notification on submission and when professor reviews
 
-**The problem without events:**
-```
-// Without events, ProjectApplicationService has to know about emails:
-projectRepository.save(project);
-emailService.sendConfirmation(project);   // now tightly coupled to email
-slackService.notify(project);             // and Slack too
-smsService.alert(project);               // and SMS too
-```
-If you add a new notification type, you have to edit `ProjectApplicationService` every time.
+### Professor
+- Register with professor email — role assigned automatically
+- Dashboard with stats (total / pending / approved / declined)
+- View all submitted projects with status filters
+- Search projects by student index or by title
+- Review projects — approve, decline, or request revision with comment
+- Assign yourself to a project after approving it
+- Set a submission deadline
 
-**The solution with events:**
-```
-// With events, ProjectApplicationService just announces what happened:
-projectRepository.save(project);
-eventPublisher.publishEvent(new ProjectSubmittedEvent(this, project));
-// Done. It doesn't know or care what listens.
-```
-
-Then separately, `NotificationEventListener` listens:
-```java
-@EventListener
-public void onProjectSubmitted(ProjectSubmittedEvent event) {
-    emailService.sendSubmissionConfirmation(event.getProject());
-}
-```
-
-To add Slack notifications later, you just add a `SlackEventListener` class — you never touch
-`ProjectApplicationServiceImpl` at all. That's the point: **the service only knows what happened,
-not what to do about it**.
-
-The `@Async` annotation means the email sends in a background thread, so the HTTP response
-returns to the student immediately without waiting for the email.
+### Shared
+- JWT authentication — stateless, token stored in localStorage
+- Expired tokens handled gracefully — redirects to login automatically
+- Email notifications via MailHog locally (real SMTP for production)
 
 ---
 
-### Security Explained (JWT + Spring Security)
+## How Emails Work
 
-Here's how the three security classes work together, in plain terms:
+In development, **MailHog** catches all emails locally. No real emails are sent.
 
-#### `JwtUtil.java`
-A helper that knows how to:
-- **Create** a JWT token: takes a user's email, packs it into a signed token string
-- **Read** a JWT token: unpacks the token to get the email back
-- **Validate** a token: checks it hasn't expired and the signature is valid
+1. Run the app and submit a project
+2. Open `http://localhost:8025`
+3. You'll see the submission confirmation and professor alert emails
 
-Think of a JWT token like a signed wristband at an event. Once you have it, you show it at every
-door instead of re-entering your name and password each time.
+**For a real demo with actual emails**, replace the mail section in `application.yml`:
 
-#### `JwtAuthFilter.java`
-Runs on **every single HTTP request** before it reaches your controller.
-1. Looks for `Authorization: Bearer <token>` in the request header
-2. If found, asks `JwtUtil` to read the email from the token
-3. Loads the user from the database
-4. If valid, tells Spring Security "this request is authenticated as this user"
-5. If no token (or invalid), it just moves on — Spring Security will block if the route requires auth
-
-#### `SecurityConfig.java`
-The rulebook. Defines:
-- Which routes are public (`/api/auth/**` — anyone can hit login/register)
-- Which routes need a specific role (`/api/projects/*/review` needs `PROFESSOR`)
-- Everything else needs to be logged in (`anyRequest().authenticated()`)
-- Plugs in `JwtAuthFilter` so it runs before every request
-- Disables sessions (stateless — the server doesn't remember you, the token proves who you are)
-
-**Flow for a protected request:**
-```
-Client → sends request with "Authorization: Bearer eyJ..."
-  ↓
-JwtAuthFilter → reads token → validates → sets authentication in Spring's context
-  ↓
-SecurityConfig rules → checks if the authenticated user has the right role
-  ↓
-Controller → @AuthenticationPrincipal gives you the logged-in user object
-```
-
----
-
-### Email — Does It Cost Money?
-
-**No — in development we use MailHog** which is 100% free and local.
-
-MailHog is a fake SMTP server that catches all "sent" emails and shows them in a web UI at
-http://localhost:8025. No real emails are sent, no Google account needed, no credit card.
-
-**If you want real emails for production** (e.g. for your final demo), the cheapest options are:
-- **Gmail App Password** — free, 500 emails/day. You enable 2FA on a Gmail account, generate an
-  "App Password", and paste it into application.yml. (See instructions below.)
-- **Brevo (ex-Sendinblue)** — free tier: 300 emails/day, no credit card
-
-**To switch to real Gmail for demo day:**
-In `application.yml`, replace the mail section with:
 ```yaml
 spring:
   mail:
@@ -180,64 +131,90 @@ spring:
             enable: true
 ```
 
----
-
-### How to Find application.yml in IntelliJ
-
-1. Open IntelliJ → open the `backend/` folder as a Maven project
-2. In the Project panel on the left, expand: `src → main → resources`
-3. `application.yml` is there
-4. If the `resources` folder has a plain folder icon instead of a resources icon:
-   - Right-click `resources` → "Mark Directory as" → "Resources Root"
-5. The file will now be recognized by Spring Boot and shown with a leaf icon
+Generate a Gmail App Password at: Google Account → Security → 2-Step Verification → App Passwords.
 
 ---
 
-### How the SQL Flyway Files Work in IntelliJ
+## QRQ Queue Setup
 
-Flyway reads SQL files from `src/main/resources/db/migration/` and runs them automatically when
-Spring Boot starts.
+1. Go to `https://qrq.app/create`
+2. Create a free queue — no account needed
+3. You get two URLs — paste both into `application.yml`:
 
-**Naming convention is strict:** `V{number}__{description}.sql`
-- `V1__init_schema.sql` — runs first, creates all tables
-- `V2__seed_data.sql` — runs second, inserts the default professor
-- If you need to add a column later: create `V3__add_something.sql` — never edit V1 or V2
-
-**In IntelliJ:**
-1. Expand `src → main → resources → db → migration`
-2. You'll see V1 and V2 already there
-3. To create a new migration: right-click the folder → New → File → name it `V3__...sql`
-4. Write your SQL there
-5. Restart the app — Flyway runs it automatically
-
-**You do NOT run these files manually.** Flyway tracks which ones it has already run in a
-`flyway_schema_history` table in your database.
-
----
-
-### Do You Need to Install PostgreSQL?
-
-**No — Docker handles it.** You don't install PostgreSQL on your machine at all.
-
-`docker-compose up -d` starts a PostgreSQL container with:
-- Database name: `projecthub`
-- Username: `projecthub`
-- Password: `projecthub123`
-- Port: 5432 (same as a normal PostgreSQL install)
-
-These match exactly what's in `application.yml`, so Spring Boot connects automatically.
-
-**To view your data** (optional):
-- Install **DBeaver** (free) or use IntelliJ's built-in Database panel
-- Connect with the credentials above, host `localhost`, port `5432`
-
-**Useful Docker commands:**
-```bash
-docker-compose up -d        # start in background
-docker-compose down         # stop
-docker-compose down -v      # stop AND delete all data (fresh start)
-docker-compose logs -f      # see live logs
+```yaml
+app:
+  queue:
+    qrq-visitor-url: "https://qrq.app/q/YOUR_ID"    # goes inside the QR code
+    qrq-status-url: "https://qrq.app/status/YOUR_ID" # display board for a TV/screen
 ```
+
+The QR code on each project links to the visitor URL. Students scan it to track their queue position live.
+
+---
+
+## Architecture
+
+### Service Layers
+
+**Domain Service** (`domain/service/`) — pure business rules, no infrastructure:
+- "A project cannot go from APPROVED back to REVISION_REQUESTED"
+- "Only the student who owns the project can edit it"
+- These rules are the same regardless of framework
+
+**Application Service** (`service/`) — coordinates use cases:
+- Loads entities from repositories
+- Calls domain services for business rules
+- Publishes events
+- Maps to response DTOs
+- Interface + implementation separation so the controller depends on the interface, not the concrete class
+
+**Infrastructure Service** (`service/EmailService.java`) — sends emails via SMTP. Called by the event listener only.
+
+### Events and Listeners
+
+`ProjectApplicationServiceImpl` never calls `emailService` directly. Instead it publishes events:
+
+```java
+eventPublisher.publishEvent(new ProjectSubmittedEvent(this, project));
+```
+
+`NotificationEventListener` listens with `@TransactionalEventListener(phase = AFTER_COMMIT)` — this means emails only fire **after the database transaction commits**, so the project is guaranteed saved before any email is sent.
+
+`@Async` on the listener means emails send in a background thread — the HTTP response returns immediately.
+
+### Security
+
+**`JwtUtil`** — creates, reads, and validates JWT tokens. Think of a token like a signed wristband: you show it at every door instead of re-entering your password.
+
+**`JwtAuthFilter`** — runs on every request. Reads the `Authorization: Bearer ...` header, validates the token, and tells Spring Security who the user is. Expired tokens are caught silently and the request continues unauthenticated — Spring Security then returns 401, and the frontend's Axios interceptor clears localStorage and redirects to login.
+
+**`SecurityConfig`** — the rulebook. Defines which routes are public, which need a role, and wires in the filter.
+
+---
+
+## Database
+
+PostgreSQL runs in Docker. The app uses **Flyway** to manage the schema — never edit migration files after they've run.
+
+```
+db/migration/
+├── V1__init_schema.sql       — creates all tables
+├── V2__seed_data.sql         — (empty, professors register themselves now)
+├── V3__add_student_index.sql — no-op (student_index moved to V1)
+└── V4__add_deadline_and_assignment.sql — deadline + assignment columns
+```
+
+To add a column later, create `V5__description.sql` — Flyway runs it automatically on restart.
+
+**Useful commands:**
+```bash
+docker-compose up -d          # start
+docker-compose down           # stop (data preserved)
+docker-compose down -v        # stop + wipe all data (fresh start)
+docker exec -it projecthub-db psql -U projecthub -d projecthub   # open psql
+```
+
+To browse data visually: install **DBeaver** (free) and connect with host `localhost`, port `5433`, database `projecthub`, user `projecthub`, password `projecthub123`.
 
 ---
 
@@ -245,10 +222,11 @@ docker-compose logs -f      # see live logs
 
 ```
 projecthub/
-├── docker-compose.yml              ← starts PostgreSQL + MailHog
+├── docker-compose.yml
+├── README.md
 │
 ├── backend/
-│   ├── pom.xml
+│   ├── pom.xml                          (Spring Boot 4, Java 21)
 │   └── src/main/
 │       ├── java/com/uni/projecthub/
 │       │   ├── ProjectHubApplication.java
@@ -262,11 +240,11 @@ projecthub/
 │       │   │   │   ├── ProjectSubmittedEvent.java
 │       │   │   │   └── ProjectReviewedEvent.java
 │       │   │   └── service/
-│       │   │       ├── ProjectDomainService.java        ← interface
-│       │   │       └── ProjectDomainServiceImpl.java    ← implementation
+│       │   │       ├── ProjectDomainService.java
+│       │   │       └── ProjectDomainServiceImpl.java
 │       │   ├── dto/
-│       │   │   ├── request/  (LoginRequest, RegisterRequest, ProjectRequest, ReviewRequest)
-│       │   │   └── response/ (AuthResponse, ProjectResponse, ReviewResponse, DashboardStatsResponse)
+│       │   │   ├── request/
+│       │   │   └── response/
 │       │   ├── entity/
 │       │   │   ├── User.java
 │       │   │   ├── Project.java
@@ -278,17 +256,17 @@ projecthub/
 │       │   │   ├── GlobalExceptionHandler.java
 │       │   │   └── ResourceNotFoundException.java
 │       │   ├── listener/
-│       │   │   └── NotificationEventListener.java      ← handles events → sends emails
+│       │   │   └── NotificationEventListener.java
 │       │   ├── repository/
 │       │   │   ├── UserRepository.java
 │       │   │   ├── ProjectRepository.java
 │       │   │   └── ReviewRepository.java
 │       │   ├── security/
-│       │   │   ├── JwtUtil.java                        ← creates/reads/validates JWT tokens
-│       │   │   └── JwtAuthFilter.java                  ← runs on every request
+│       │   │   ├── JwtUtil.java
+│       │   │   └── JwtAuthFilter.java
 │       │   ├── service/
-│       │   │   ├── ProjectApplicationService.java      ← interface
-│       │   │   ├── ProjectApplicationServiceImpl.java  ← implementation
+│       │   │   ├── ProjectApplicationService.java
+│       │   │   ├── ProjectApplicationServiceImpl.java
 │       │   │   ├── AuthService.java
 │       │   │   ├── EmailService.java
 │       │   │   └── UserDetailsServiceImpl.java
@@ -298,46 +276,62 @@ projecthub/
 │           ├── application.yml
 │           └── db/migration/
 │               ├── V1__init_schema.sql
-│               └── V2__seed_data.sql
+│               ├── V2__seed_data.sql
+│               ├── V3__add_student_index.sql
+│               └── V4__add_deadline_and_assignment.sql
 │
 └── frontend/
-    ├── src/
-    │   ├── api/          (axios.js, index.js)
-    │   ├── assets/       (main.css)
-    │   ├── components/common/
-    │   │   ├── StatusBadge.vue
-    │   │   ├── BaseSpinner.vue
-    │   │   └── QrCodeCard.vue
-    │   ├── router/       (index.js — routes + guards)
-    │   ├── stores/       (auth.js, projects.js)
-    │   └── views/
-    │       ├── auth/     (LoginView, RegisterView)
-    │       ├── student/  (Layout, Projects, Submit, Detail)
-    │       ├── professor/(Layout, Dashboard, Projects, Detail with review form)
-    │       └── NotFoundView.vue
+    ├── index.html
     ├── package.json
     ├── vite.config.js
-    └── tailwind.config.js
-
+    ├── tailwind.config.js
+    └── src/
+        ├── api/
+        │   ├── axios.js
+        │   └── index.js
+        ├── assets/
+        │   └── main.css
+        ├── components/common/
+        │   ├── StatusBadge.vue
+        │   ├── BaseSpinner.vue
+        │   └── QrCodeCard.vue
+        ├── router/
+        │   └── index.js
+        ├── stores/
+        │   ├── auth.js
+        │   └── projects.js
+        └── views/
+            ├── auth/
+            │   ├── LoginView.vue
+            │   └── RegisterView.vue
+            ├── student/
+            │   ├── StudentLayout.vue
+            │   ├── StudentProjectsView.vue
+            │   ├── SubmitProjectView.vue
+            │   └── StudentProjectDetailView.vue
+            ├── professor/
+            │   ├── ProfessorLayout.vue
+            │   ├── ProfessorDashboardView.vue
+            │   ├── ProfessorProjectsView.vue
+            │   └── ProfessorProjectDetailView.vue
+            └── NotFoundView.vue
 ```
 
 ---
 
-## Default Accounts
+## Common Issues
 
-| Role      | Email                | Password      |
-|-----------|----------------------|---------------|
-| Professor | professor@uni.edu    | professor123  |
+**`password authentication failed for user "projecthub"`**
+You ran `docker-compose up` from the wrong folder. Run it from the root `projecthub/` folder, not `backend/`. Then run `docker-compose down -v` to wipe the bad volume and `docker-compose up -d` again from the right folder.
 
-Students register themselves at `/register`.
+**`Unable to determine Dialect`**
+Make sure `application.yml` has `database-platform: org.hibernate.dialect.PostgreSQLDialect` under `spring.jpa`.
 
----
+**JWT expired error**
+Open browser console and run `localStorage.clear()`, then refresh and log in again.
 
-## QRQ Queue Setup
+**Packages not recognized in IntelliJ**
+Right-click `pom.xml` → Maven → Reload Project. If that fails: File → Invalidate Caches → Invalidate and Restart.
 
-1. Go to https://qrq.app/create
-2. Create a free queue (no account needed)
-3. Copy the status URL they give you — looks like `https://qrq.app/status/810407`
-4. Paste it into `application.yml` under `app.queue.qrq-status-url`
-5. Every submitted project will have a QR code that links to this page
-6. The professor advances the queue from their phone as they review projects
+**Frontend has no styling**
+Run `npm install` inside the `frontend/` folder first, then `npm run dev`.
