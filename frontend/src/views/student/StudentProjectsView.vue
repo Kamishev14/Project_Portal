@@ -35,6 +35,11 @@
             </div>
             <p class="font-semibold text-white truncate">{{ project.title }}</p>
             <p class="text-sm mt-1 line-clamp-1" style="color:#666">{{ project.description }}</p>
+            <p v-if="project.preferredProfessor || project.participants?.length" class="text-xs mt-2" style="color:#444">
+              <span v-if="project.preferredProfessor">Preferred professor: {{ project.preferredProfessor.name }}</span>
+              <span v-if="project.preferredProfessor && project.participants?.length"> · </span>
+              <span v-if="project.participants?.length">{{ project.participants.length }} colleague{{ project.participants.length !== 1 ? 's' : '' }}</span>
+            </p>
           </div>
           <div class="text-right shrink-0">
             <p class="text-xs" style="color:#444">{{ formatDate(project.createdAt) }}</p>

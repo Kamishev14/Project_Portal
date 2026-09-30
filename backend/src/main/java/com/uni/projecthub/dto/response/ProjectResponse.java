@@ -19,17 +19,10 @@ public class ProjectResponse {
     private String qrCodeUrl;       // endpoint that returns the QR image PNG
     private String qrqVisitorUrl;   // goes INSIDE the QR — student scans to join queue
     private String qrqStatusUrl;    // display board link — show on TV/screen
-    private StudentSummary student;
+    private UserSummaryResponse student;
+    private UserSummaryResponse preferredProfessor;
+    private List<UserSummaryResponse> participants;
     private List<ReviewResponse> reviews;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
-    @Data
-    @Builder
-    public static class StudentSummary {
-        private UUID id;
-        private String studentIndex;
-        private String name;
-        private String email;
-    }
 }

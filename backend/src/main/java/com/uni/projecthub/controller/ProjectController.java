@@ -4,6 +4,7 @@ import com.uni.projecthub.dto.request.ProjectRequest;
 import com.uni.projecthub.dto.request.ReviewRequest;
 import com.uni.projecthub.dto.response.DashboardStatsResponse;
 import com.uni.projecthub.dto.response.ProjectResponse;
+import com.uni.projecthub.dto.response.UserSummaryResponse;
 import com.uni.projecthub.enums.ProjectStatus;
 import com.uni.projecthub.service.ProjectApplicationService;
 import com.uni.projecthub.util.QrCodeUtil;
@@ -108,6 +109,11 @@ public class ProjectController {
     @GetMapping("/stats")
     public ResponseEntity<DashboardStatsResponse> getStats() {
         return ResponseEntity.ok(projectService.getDashboardStats());
+    }
+
+    @GetMapping("/professors/options")
+    public ResponseEntity<List<UserSummaryResponse>> getProfessorOptions() {
+        return ResponseEntity.ok(projectService.getProfessorOptions());
     }
 
     // ── Shared ────────────────────────────────────────────────────────────────

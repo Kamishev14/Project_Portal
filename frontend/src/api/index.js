@@ -12,6 +12,7 @@ export const projectApi = {
   getMyProject:      (id)         => api.get(`/projects/mine/${id}`),
   editProject:       (id, data)   => api.put(`/projects/mine/${id}`, data),
   deleteProject:     (id)         => api.delete(`/projects/mine/${id}`),
+  getProfessorOptions: ()         => api.get('/projects/professors/options'),
 
   // Professor
   getAll:            (params)     => api.get('/projects', { params }),

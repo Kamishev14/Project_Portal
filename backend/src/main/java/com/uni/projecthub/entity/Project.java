@@ -34,6 +34,20 @@ public class Project {
     @JoinColumn(name = "student_id", nullable = false)
     private User student;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "preferred_professor_id")
+    private User preferredProfessor;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "project_participants",
+            joinColumns = @JoinColumn(name = "project_id"),
+            inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    @OrderBy("studentIndex ASC")
+    @Builder.Default
+    private Set<User> participants = new LinkedHashSet<>();
+
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @OrderBy("reviewedAt DESC")
     @Builder.Default

@@ -4,6 +4,7 @@ import com.uni.projecthub.dto.request.ProjectRequest;
 import com.uni.projecthub.dto.request.ReviewRequest;
 import com.uni.projecthub.dto.response.DashboardStatsResponse;
 import com.uni.projecthub.dto.response.ProjectResponse;
+import com.uni.projecthub.dto.response.UserSummaryResponse;
 import com.uni.projecthub.enums.ProjectStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,4 +33,6 @@ public interface ProjectApplicationService {
     ProjectResponse reviewProject(UUID projectId, ReviewRequest request, String professorEmail);
 
     DashboardStatsResponse getDashboardStats();
+
+    List<UserSummaryResponse> getProfessorOptions();
 }

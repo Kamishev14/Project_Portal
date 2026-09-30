@@ -88,6 +88,11 @@
                 <span class="text-xs font-mono font-bold" style="color:#22c55e">{{ p.student.studentIndex }}</span>
                 <span class="text-xs" style="color:#444">{{ p.student.name }} · {{ p.student.email }}</span>
               </div>
+              <p v-if="p.preferredProfessor || p.participants?.length" class="text-xs mt-1" style="color:#444">
+                <span v-if="p.preferredProfessor">Preferred professor: {{ p.preferredProfessor.name }}</span>
+                <span v-if="p.preferredProfessor && p.participants?.length"> · </span>
+                <span v-if="p.participants?.length">{{ p.participants.length }} teammate{{ p.participants.length !== 1 ? 's' : '' }}</span>
+              </p>
             </div>
             <p class="text-xs shrink-0" style="color:#444">{{ formatDate(p.createdAt) }}</p>
           </div>

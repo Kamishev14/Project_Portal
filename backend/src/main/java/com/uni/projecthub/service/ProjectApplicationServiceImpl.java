@@ -8,10 +8,12 @@ import com.uni.projecthub.dto.request.ReviewRequest;
 import com.uni.projecthub.dto.response.DashboardStatsResponse;
 import com.uni.projecthub.dto.response.ProjectResponse;
 import com.uni.projecthub.dto.response.ReviewResponse;
+import com.uni.projecthub.dto.response.UserSummaryResponse;
 import com.uni.projecthub.entity.Project;
 import com.uni.projecthub.entity.Review;
 import com.uni.projecthub.entity.User;
 import com.uni.projecthub.enums.ProjectStatus;
+import com.uni.projecthub.enums.Role;
 import com.uni.projecthub.exception.ResourceNotFoundException;
 import com.uni.projecthub.repository.ProjectRepository;
 import com.uni.projecthub.repository.ReviewRepository;
@@ -24,8 +26,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,11 +61,11 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
         User student = findUserByEmail(studentEmail);
 
         Project project = Project.builder()
-                .title(request.getTitle())
-                .description(request.getDescription())
                 .status(ProjectStatus.PENDING)
                 .student(student)
                 .build();
+
+        applyProjectDetails(project, request, student);
 
         int nextNumber = projectRepository.getNextQueueNumber();
         domainService.assignQueueNumber(project, nextNumber);
@@ -104,8 +111,7 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
             );
         }
 
-        project.setTitle(request.getTitle());
-        project.setDescription(request.getDescription());
+        applyProjectDetails(project, request, student);
         projectRepository.save(project);
 
         return toResponse(project);
@@ -198,7 +204,25 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserSummaryResponse> getProfessorOptions() {
+        return userRepository.findAllByRoleOrderByNameAsc(Role.PROFESSOR)
+                .stream()
+                .map(this::toUserSummary)
+                .toList();
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void applyProjectDetails(Project project, ProjectRequest request, User owner) {
+        project.setTitle(request.getTitle());
+        project.setDescription(request.getDescription());
+        project.setPreferredProfessor(resolvePreferredProfessor(request.getPreferredProfessorId()));
+        Set<User> resolvedParticipants = resolveParticipants(request.getParticipantStudentIndexes(), owner);
+        project.getParticipants().clear();
+        project.getParticipants().addAll(resolvedParticipants);
+    }
 
     private Project findProject(UUID id) {
         return projectRepository.findById(id)
@@ -208,6 +232,71 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+    }
+
+    private User resolvePreferredProfessor(UUID preferredProfessorId) {
+        if (preferredProfessorId == null) {
+            return null;
+        }
+
+        return userRepository.findByIdAndRole(preferredProfessorId, Role.PROFESSOR)
+                .orElseThrow(() -> new ResourceNotFoundException("Professor not found: " + preferredProfessorId));
+    }
+
+    private Set<User> resolveParticipants(List<String> participantStudentIndexes, User owner) {
+        if (participantStudentIndexes == null || participantStudentIndexes.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+
+        List<String> normalizedIndexes = participantStudentIndexes.stream()
+                .filter(index -> index != null && !index.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+
+        if (normalizedIndexes.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+
+        if (owner.getStudentIndex() != null && normalizedIndexes.contains(owner.getStudentIndex())) {
+            throw new IllegalArgumentException("Do not include your own student index as a participant");
+        }
+
+        List<User> participants = userRepository.findAllByStudentIndexIn(normalizedIndexes);
+        Map<String, User> usersByIndex = participants.stream()
+                .collect(Collectors.toMap(User::getStudentIndex, user -> user, (left, right) -> left, LinkedHashMap::new));
+
+        List<String> missingIndexes = normalizedIndexes.stream()
+                .filter(index -> !usersByIndex.containsKey(index))
+                .toList();
+
+        if (!missingIndexes.isEmpty()) {
+            throw new ResourceNotFoundException("Participant(s) not found: " + String.join(", ", missingIndexes));
+        }
+
+        boolean hasNonStudentParticipant = participants.stream()
+                .anyMatch(user -> user.getRole() != Role.STUDENT);
+
+        if (hasNonStudentParticipant) {
+            throw new IllegalArgumentException("Only student accounts can be added as participants");
+        }
+
+        Set<User> orderedParticipants = new LinkedHashSet<>();
+        normalizedIndexes.forEach(index -> orderedParticipants.add(usersByIndex.get(index)));
+        return orderedParticipants;
+    }
+
+    private UserSummaryResponse toUserSummary(User user) {
+        if (user == null) {
+            return null;
+        }
+
+        return UserSummaryResponse.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .studentIndex(user.getStudentIndex())
+                .build();
     }
 
     private ProjectResponse toResponse(Project p) {
@@ -230,20 +319,14 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
                 .qrCodeUrl(frontendUrl + "/api/projects/" + p.getId() + "/qr")
                 .qrqVisitorUrl(qrqVisitorUrl)   // inside the QR — student scans this
                 .qrqStatusUrl(qrqStatusUrl)      // display board link
-                .student(ProjectResponse.StudentSummary.builder()
-                        .id(p.getStudent().getId())
-                        .studentIndex(p.getStudent().getStudentIndex())
-                        .name(p.getStudent().getName())
-                        .email(p.getStudent().getEmail())
-                        .build())
+                .student(toUserSummary(p.getStudent()))
+                .preferredProfessor(toUserSummary(p.getPreferredProfessor()))
+                .participants(p.getParticipants().stream().map(this::toUserSummary).toList())
                 .reviews(reviews)
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
                 .build();
     }
-    // ── add these two methods to projectapplicationserviceimpl ─────────────────
-// Place them after getMyProject() and before getAllProjects()
-
 
 
 }

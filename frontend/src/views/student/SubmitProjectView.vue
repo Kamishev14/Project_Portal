@@ -46,6 +46,40 @@
           </p>
         </div>
 
+        <div>
+          <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Preferred Professor</label>
+          <select v-model="form.preferredProfessorId" class="input">
+            <option value="">No preference</option>
+            <option
+              v-for="professor in store.professorOptions"
+              :key="professor.id"
+              :value="professor.id"
+            >
+              {{ professor.name }} — {{ professor.email }}
+            </option>
+          </select>
+          <p class="text-xs mt-1.5" style="color:#444">
+            Optional. Students can still submit without choosing a professor.
+          </p>
+          <p v-if="store.professorOptionsLoading" class="text-xs mt-1.5" style="color:#555">Loading professors...</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Participating Colleagues</label>
+          <textarea
+            v-model="form.participantStudentIndexes"
+            class="input resize-none font-mono"
+            rows="3"
+            placeholder="Enter 6-digit student indexes, separated by commas or new lines&#10;e.g. 201001, 201045"
+          ></textarea>
+          <p class="text-xs mt-1.5" style="color:#444">
+            Optional. Add classmates who are working on this project with you. They must already be registered student accounts.
+          </p>
+          <p v-if="parsedParticipantIndexes.length" class="text-xs mt-1.5" style="color:#22c55e">
+            {{ parsedParticipantIndexes.length }} participant{{ parsedParticipantIndexes.length !== 1 ? 's' : '' }} detected.
+          </p>
+        </div>
+
         <div v-if="errorMsg" class="px-3 py-2.5 rounded-md text-sm" style="background:#1a0000;color:#f87171;border:1px solid #3a0000">
           {{ errorMsg }}
         </div>
@@ -63,23 +97,53 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useProjectStore } from '@/stores/projects'
 import QrCodeCard from '@/components/common/QrCodeCard.vue'
 
 const store            = useProjectStore()
-const form             = ref({ title: '', description: '' })
+const form             = ref({ title: '', description: '', preferredProfessorId: '', participantStudentIndexes: '' })
 const submitted        = ref(false)
 const submittedProject = ref(null)
 const errorMsg         = ref('')
 
+const parsedParticipantIndexes = computed(() => parseParticipantIndexes(form.value.participantStudentIndexes))
+
+onMounted(async () => {
+  try {
+    await store.fetchProfessorOptions()
+  } catch (e) {
+    errorMsg.value = store.error || 'Failed to load professors'
+  }
+})
+
 async function handleSubmit() {
   errorMsg.value = ''
+
+  const invalidParticipant = parsedParticipantIndexes.value.find(index => !/^\d{6}$/.test(index))
+  if (invalidParticipant) {
+    errorMsg.value = `Participant index must be exactly 6 digits: ${invalidParticipant}`
+    return
+  }
+
   try {
-    submittedProject.value = await store.submitProject(form.value)
+    submittedProject.value = await store.submitProject({
+      title: form.value.title,
+      description: form.value.description,
+      preferredProfessorId: form.value.preferredProfessorId || null,
+      participantStudentIndexes: parsedParticipantIndexes.value
+    })
     submitted.value = true
   } catch (e) {
     errorMsg.value = store.error || 'Submission failed. Please try again.'
   }
+}
+
+function parseParticipantIndexes(rawValue) {
+  return rawValue
+    .split(/[\n,]/)
+    .map(value => value.trim())
+    .filter(Boolean)
+    .filter((value, index, list) => list.indexOf(value) === index)
 }
 </script>

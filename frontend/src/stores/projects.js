@@ -7,9 +7,30 @@ export const useProjectStore = defineStore('projects', () => {
   const allProjects    = ref([])
   const currentProject = ref(null)
   const stats          = ref(null)
+  const professorOptions = ref([])
   const pagination     = ref({ page: 0, size: 10, totalPages: 0, totalElements: 0 })
   const loading        = ref(false)
+  const professorOptionsLoading = ref(false)
   const error          = ref(null)
+
+  function parseApiError(e, fallback) {
+    const data = e.response?.data
+
+    if (typeof data?.message === 'string' && data.message.trim()) {
+      return data.message
+    }
+
+    if (typeof data === 'string' && data.trim()) {
+      return data
+    }
+
+    if (data && typeof data === 'object') {
+      const firstMessage = Object.values(data).find(value => typeof value === 'string' && value.trim())
+      if (firstMessage) return firstMessage
+    }
+
+    return fallback
+  }
 
   // ── Student ────────────────────────────────────────────────────────────────
 
@@ -21,7 +42,7 @@ export const useProjectStore = defineStore('projects', () => {
       myProjects.value.unshift(res.data)
       return res.data
     } catch (e) {
-      error.value = e.response?.data?.message || 'Submission failed'
+      error.value = parseApiError(e, 'Submission failed')
       throw e
     } finally {
       loading.value = false
@@ -59,7 +80,7 @@ export const useProjectStore = defineStore('projects', () => {
       if (idx !== -1) myProjects.value[idx] = res.data
       return res.data
     } catch (e) {
-      error.value = e.response?.data?.message || 'Edit failed'
+      error.value = parseApiError(e, 'Edit failed')
       throw e
     } finally {
       loading.value = false
@@ -74,10 +95,27 @@ export const useProjectStore = defineStore('projects', () => {
       myProjects.value = myProjects.value.filter(p => p.id !== id)
       currentProject.value = null
     } catch (e) {
-      error.value = e.response?.data?.message || 'Delete failed'
+      error.value = parseApiError(e, 'Delete failed')
       throw e
     } finally {
       loading.value = false
+    }
+  }
+
+  async function fetchProfessorOptions(force = false) {
+    if (!force && professorOptions.value.length > 0) return professorOptions.value
+
+    professorOptionsLoading.value = true
+    error.value = null
+    try {
+      const res = await projectApi.getProfessorOptions()
+      professorOptions.value = res.data
+      return res.data
+    } catch (e) {
+      error.value = parseApiError(e, 'Failed to load professors')
+      throw e
+    } finally {
+      professorOptionsLoading.value = false
     }
   }
 
@@ -119,7 +157,7 @@ export const useProjectStore = defineStore('projects', () => {
       if (idx !== -1) allProjects.value[idx] = res.data
       return res.data
     } catch (e) {
-      error.value = e.response?.data?.message || 'Review failed'
+      error.value = parseApiError(e, 'Review failed')
       throw e
     } finally {
       loading.value = false
@@ -132,9 +170,9 @@ export const useProjectStore = defineStore('projects', () => {
   }
 
   return {
-    myProjects, allProjects, currentProject, stats, pagination,
-    loading, error,
-    submitProject, fetchMyProjects, fetchMyProject, editProject, deleteProject,
+    myProjects, allProjects, currentProject, stats, professorOptions, pagination,
+    loading, professorOptionsLoading, error,
+    submitProject, fetchMyProjects, fetchMyProject, editProject, deleteProject, fetchProfessorOptions,
     fetchAllProjects, fetchProjectById, reviewProject, fetchStats
   }
 })

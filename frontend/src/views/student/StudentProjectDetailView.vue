@@ -49,6 +49,29 @@
                 <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Description</label>
                 <textarea v-model="editForm.description" class="input resize-none" rows="5" required minlength="20"></textarea>
               </div>
+              <div>
+                <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Preferred Professor</label>
+                <select v-model="editForm.preferredProfessorId" class="input">
+                  <option value="">No preference</option>
+                  <option
+                    v-for="professor in store.professorOptions"
+                    :key="professor.id"
+                    :value="professor.id"
+                  >
+                    {{ professor.name }} — {{ professor.email }}
+                  </option>
+                </select>
+                <p v-if="store.professorOptionsLoading" class="text-xs mt-1.5" style="color:#555">Loading professors...</p>
+              </div>
+              <div>
+                <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Participating Colleagues</label>
+                <textarea
+                  v-model="editForm.participantStudentIndexes"
+                  class="input resize-none font-mono"
+                  rows="3"
+                  placeholder="Enter 6-digit student indexes separated by commas or new lines"
+                ></textarea>
+              </div>
               <div v-if="editError" class="px-3 py-2 rounded text-sm" style="background:#1a0000;color:#f87171;border:1px solid #3a0000">
                 {{ editError }}
               </div>
@@ -65,6 +88,36 @@
           <div v-else class="card">
             <p class="text-xs font-medium tracking-widest uppercase mb-3" style="color:#555">Description</p>
             <p class="text-sm leading-relaxed whitespace-pre-wrap" style="color:#ccc">{{ project.description }}</p>
+          </div>
+
+          <div class="card">
+            <p class="text-xs font-medium tracking-widest uppercase mb-3" style="color:#555">Team & Professor</p>
+
+            <div class="space-y-4">
+              <div>
+                <p class="text-xs uppercase tracking-wide mb-1" style="color:#444">Preferred Professor</p>
+                <p v-if="project.preferredProfessor" class="text-sm" style="color:#ccc">
+                  {{ project.preferredProfessor.name }} · {{ project.preferredProfessor.email }}
+                </p>
+                <p v-else class="text-sm italic" style="color:#555">No preferred professor selected.</p>
+              </div>
+
+              <div>
+                <p class="text-xs uppercase tracking-wide mb-1" style="color:#444">Participating Colleagues</p>
+                <div v-if="project.participants?.length" class="space-y-2">
+                  <div
+                    v-for="participant in project.participants"
+                    :key="participant.id"
+                    class="rounded-md px-3 py-2"
+                    style="background:#111;border:1px solid #222"
+                  >
+                    <p class="text-sm text-white">{{ participant.name }}</p>
+                    <p class="text-xs font-mono" style="color:#22c55e">{{ participant.studentIndex }}</p>
+                  </div>
+                </div>
+                <p v-else class="text-sm italic" style="color:#555">No colleagues added yet.</p>
+              </div>
+            </div>
           </div>
 
           <!-- Review history -->
@@ -116,7 +169,7 @@ const project = computed(() => store.currentProject)
 
 // Edit state
 const editing   = ref(false)
-const editForm  = ref({ title: '', description: '' })
+const editForm  = ref({ title: '', description: '', preferredProfessorId: '', participantStudentIndexes: '' })
 const editError = ref('')
 
 // Delete state
@@ -128,10 +181,22 @@ const canEdit = computed(() =>
   ['PENDING', 'REVISION_REQUESTED'].includes(project.value.status)
 )
 
-onMounted(() => store.fetchMyProject(route.params.id))
+onMounted(async () => {
+  await store.fetchMyProject(route.params.id)
+  try {
+    await store.fetchProfessorOptions()
+  } catch (e) {
+    // keep the detail view usable even if professor options fail to load
+  }
+})
 
 function startEdit() {
-  editForm.value = { title: project.value.title, description: project.value.description }
+  editForm.value = {
+    title: project.value.title,
+    description: project.value.description,
+    preferredProfessorId: project.value.preferredProfessor?.id || '',
+    participantStudentIndexes: participantIndexesAsText(project.value.participants)
+  }
   editError.value = ''
   editing.value = true
 }
@@ -143,8 +208,21 @@ function cancelEdit() {
 
 async function handleEdit() {
   editError.value = ''
+
+  const parsedParticipantIndexes = parseParticipantIndexes(editForm.value.participantStudentIndexes)
+  const invalidParticipant = parsedParticipantIndexes.find(index => !/^\d{6}$/.test(index))
+  if (invalidParticipant) {
+    editError.value = `Participant index must be exactly 6 digits: ${invalidParticipant}`
+    return
+  }
+
   try {
-    await store.editProject(route.params.id, editForm.value)
+    await store.editProject(route.params.id, {
+      title: editForm.value.title,
+      description: editForm.value.description,
+      preferredProfessorId: editForm.value.preferredProfessorId || null,
+      participantStudentIndexes: parsedParticipantIndexes
+    })
     editing.value = false
   } catch (e) {
     editError.value = store.error || 'Failed to save changes'
@@ -167,6 +245,19 @@ async function handleDelete() {
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
+
+function participantIndexesAsText(participants = []) {
+  return participants.map(participant => participant.studentIndex).filter(Boolean).join(', ')
+}
+
+function parseParticipantIndexes(rawValue) {
+  return rawValue
+    .split(/[\n,]/)
+    .map(value => value.trim())
+    .filter(Boolean)
+    .filter((value, index, list) => list.indexOf(value) === index)
+}
+
 function reviewColor(status) {
   return { APPROVED: '#22c55e', DECLINED: '#f87171', REVISION_REQUESTED: '#60a5fa', PENDING: '#f59e0b' }[status] || '#333'
 }

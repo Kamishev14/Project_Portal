@@ -26,6 +26,36 @@
             <p class="text-sm leading-relaxed whitespace-pre-wrap" style="color:#ccc">{{ project.description }}</p>
           </div>
 
+          <div class="card">
+            <p class="text-xs font-medium tracking-widest uppercase mb-3" style="color:#555">Team & Preference</p>
+
+            <div class="space-y-4">
+              <div>
+                <p class="text-xs uppercase tracking-wide mb-1" style="color:#444">Preferred Professor</p>
+                <p v-if="project.preferredProfessor" class="text-sm" style="color:#ccc">
+                  {{ project.preferredProfessor.name }} · {{ project.preferredProfessor.email }}
+                </p>
+                <p v-else class="text-sm italic" style="color:#555">No professor preference selected.</p>
+              </div>
+
+              <div>
+                <p class="text-xs uppercase tracking-wide mb-1" style="color:#444">Participating Colleagues</p>
+                <div v-if="project.participants?.length" class="space-y-2">
+                  <div
+                    v-for="participant in project.participants"
+                    :key="participant.id"
+                    class="rounded-md px-3 py-2"
+                    style="background:#111;border:1px solid #222"
+                  >
+                    <p class="text-sm text-white">{{ participant.name }}</p>
+                    <p class="text-xs font-mono" style="color:#22c55e">{{ participant.studentIndex }} · {{ participant.email }}</p>
+                  </div>
+                </div>
+                <p v-else class="text-sm italic" style="color:#555">This is currently a solo submission.</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Review form -->
           <div class="card">
             <p class="text-xs font-medium tracking-widest uppercase mb-4" style="color:#555">Submit Review</p>
