@@ -30,7 +30,10 @@ import java.util.UUID;
 @RequestMapping("/api/projects")
 @RequiredArgsConstructor
 @Validated
-public class ProjectController {
+public class
+
+
+ProjectController {
 
     private final ProjectApplicationService projectService;
     private final QrCodeUtil qrCodeUtil;
@@ -80,9 +83,10 @@ public class ProjectController {
     @GetMapping
     public ResponseEntity<Page<ProjectResponse>> getAllProjects(
             @RequestParam(required = false) ProjectStatus status,
+            @RequestParam(required = false) String title,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
-        return ResponseEntity.ok(projectService.getAllProjects(status, pageable));
+        return ResponseEntity.ok(projectService.getAllProjects(status, title, pageable));
     }
 
     @GetMapping("/student/{studentIndex}")

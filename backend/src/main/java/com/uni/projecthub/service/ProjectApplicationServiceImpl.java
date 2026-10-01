@@ -38,10 +38,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProjectApplicationServiceImpl implements ProjectApplicationService {
 
-    private final ProjectRepository        projectRepository;
-    private final ReviewRepository         reviewRepository;
-    private final UserRepository           userRepository;
-    private final ProjectDomainService     domainService;
+    private final ProjectRepository projectRepository;
+    private final ReviewRepository reviewRepository;
+    private final UserRepository userRepository;
+    private final ProjectDomainService domainService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.frontend-url}")
@@ -91,7 +91,7 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
     @Transactional(readOnly = true)
     public ProjectResponse getMyProject(UUID projectId, String studentEmail) {
         Project project = findProject(projectId);
-        User    student = findUserByEmail(studentEmail);
+        User student = findUserByEmail(studentEmail);
         domainService.assertStudentOwns(project, student);
         return toResponse(project);
     }
@@ -100,7 +100,7 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
     @Transactional
     public ProjectResponse editProject(UUID projectId, ProjectRequest request, String studentEmail) {
         Project project = findProject(projectId);
-        User    student = findUserByEmail(studentEmail);
+        User student = findUserByEmail(studentEmail);
         domainService.assertStudentOwns(project, student);
 
         // Only editable if pending or revision requested — not after approval/decline
@@ -121,7 +121,7 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
     @Transactional
     public void deleteProject(UUID projectId, String studentEmail) {
         Project project = findProject(projectId);
-        User    student = findUserByEmail(studentEmail);
+        User student = findUserByEmail(studentEmail);
         domainService.assertStudentOwns(project, student);
 
         if (project.getStatus() == ProjectStatus.APPROVED ||
@@ -138,12 +138,27 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ProjectResponse> getAllProjects(ProjectStatus status, Pageable pageable) {
+    public Page<ProjectResponse> getAllProjects(ProjectStatus status, String title, Pageable pageable) {
+        String normalizedTitle = (title == null) ? null : title.trim();
+
+        if (status != null && normalizedTitle != null && !normalizedTitle.isBlank()) {
+            return projectRepository
+                    .findByStatusAndTitleContainingIgnoreCaseOrderByCreatedAtDesc(status, normalizedTitle, pageable)
+                    .map(this::toResponse);
+        }
+
         if (status != null) {
             return projectRepository
                     .findByStatusOrderByCreatedAtDesc(status, pageable)
                     .map(this::toResponse);
         }
+
+        if (normalizedTitle != null && !normalizedTitle.isBlank()) {
+            return projectRepository
+                    .findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(normalizedTitle, pageable)
+                    .map(this::toResponse);
+        }
+
         return projectRepository
                 .findAllByOrderByCreatedAtDesc(pageable)
                 .map(this::toResponse);
@@ -173,8 +188,8 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
     @Override
     @Transactional
     public ProjectResponse reviewProject(UUID projectId, ReviewRequest request, String professorEmail) {
-        Project project   = findProject(projectId);
-        User    professor = findUserByEmail(professorEmail);
+        Project project = findProject(projectId);
+        User professor = findUserByEmail(professorEmail);
 
         domainService.validateStatusTransition(project.getStatus(), request.getStatus());
 

@@ -26,6 +26,10 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     long countByStatus(ProjectStatus status);
 
+    Page<Project> findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(String title, Pageable pageable);
+
+    Page<Project> findByStatusAndTitleContainingIgnoreCaseOrderByCreatedAtDesc(ProjectStatus status, String title, Pageable pageable);
+
     @Query("SELECT COALESCE(MAX(p.queueNumber), 1000) + 1 FROM Project p")
     int getNextQueueNumber();
 }

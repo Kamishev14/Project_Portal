@@ -24,7 +24,7 @@ public interface ProjectApplicationService {
 
     void deleteProject(UUID projectId, String studentEmail);
 
-    Page<ProjectResponse> getAllProjects(ProjectStatus status, Pageable pageable);
+    Page<ProjectResponse> getAllProjects(ProjectStatus status, String title, Pageable pageable);
 
     List<ProjectResponse> getProjectsByStudentIndex(String studentIndex);
 
