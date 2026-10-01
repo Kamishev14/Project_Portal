@@ -2,18 +2,20 @@
   <div>
     <RouterLink to="/student/projects" class="text-xs hover:underline" style="color:#555">← Back</RouterLink>
 
-    <BaseSpinner v-if="store.loading && !project" />
+    <BaseSpinner v-if="store.loading && !project"/>
 
     <template v-else-if="project">
       <div class="mt-5 mb-8">
         <div class="flex items-center gap-2 mb-2">
           <span class="text-xs font-mono" style="color:#444">Queue #{{ project.queueNumber }}</span>
-          <StatusBadge :status="project.status" />
+          <StatusBadge :status="project.status"/>
         </div>
         <div class="flex items-start justify-between gap-4">
           <h1 class="text-2xl font-bold tracking-tight text-white">{{ project.title }}</h1>
           <div v-if="canEdit" class="flex gap-2 shrink-0">
-            <button @click="startEdit" class="btn-secondary text-xs">Edit</button>
+            <button @click="startEdit" class="btn-secondary text-xs">
+              {{ isRevisionRequested ? 'Revise & Resubmit' : 'Edit' }}
+            </button>
             <button @click="confirmDelete" class="btn-danger text-xs">Delete</button>
           </div>
         </div>
@@ -38,42 +40,55 @@
 
           <!-- Edit form -->
           <div v-if="editing" class="card">
-            <p class="text-xs font-medium tracking-widest uppercase mb-4" style="color:#555">Edit Project</p>
+            <p class="text-xs font-medium tracking-widest uppercase mb-4" style="color:#555">
+              {{ isRevisionRequested ? 'Revise Project' : 'Edit Project' }}</p>
+
+            <div v-if="isRevisionRequested && project.reviews?.length" class="rounded-md px-3 py-3 mb-4"
+                 style="background:#111827;border:1px solid #1f2937"><p class="text-xs uppercase tracking-wide mb-1"
+                                                                        style="color:#60a5fa">Revision requested</p>
+              <p class="text-sm" style="color:#cbd5e1"> {{
+                  project.reviews[project.reviews.length - 1]?.comment || 'Your professor asked for updates before approval.'
+                }} </p></div>
             <form @submit.prevent="handleEdit" class="space-y-4">
               <div>
                 <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Title</label>
-                <input v-model="editForm.title" type="text" class="input" required minlength="5" maxlength="200" />
+                <input v-model="editForm.title" type="text" class="input" required minlength="5" maxlength="200"/>
               </div>
               <div>
-                <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Description</label>
-                <textarea v-model="editForm.description" class="input resize-none" rows="5" required minlength="20"></textarea>
+                <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase"
+                       style="color:#777">Description</label>
+                <textarea v-model="editForm.description" class="input resize-none" rows="5" required
+                          minlength="20"></textarea>
               </div>
               <div>
-                <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Preferred Professor</label>
+                <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Preferred
+                  Professor</label>
                 <select v-model="editForm.preferredProfessorId" class="input">
                   <option value="">No preference</option>
                   <option
-                    v-for="professor in store.professorOptions"
-                    :key="professor.id"
-                    :value="professor.id"
+                      v-for="professor in store.professorOptions"
+                      :key="professor.id"
+                      :value="professor.id"
                   >
                     {{ professor.name }} — {{ professor.email }}
                   </option>
                 </select>
-                <p v-if="store.professorOptionsLoading" class="text-xs mt-1.5" style="color:#555">Loading professors...</p>
+                <p v-if="store.professorOptionsLoading" class="text-xs mt-1.5" style="color:#555">Loading
+                  professors...</p>
               </div>
               <div>
-                <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Participating Colleagues</label>
+                <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Participating
+                  Colleagues</label>
                 <textarea
-                  v-model="editForm.participantStudentIndexes"
-                  class="input resize-none font-mono"
-                  rows="3"
-                  placeholder="Enter 6-digit student indexes separated by commas or new lines"
+                    v-model="editForm.participantStudentIndexes"
+                    class="input resize-none font-mono"
+                    rows="3"
+                    placeholder="Enter 6-digit student indexes separated by commas or new lines"
                 ></textarea>
               </div>
               <div class="flex gap-2">
                 <button type="submit" class="btn-primary text-xs" :disabled="store.loading">
-                  <span v-if="store.loading">↻ </span>Save Changes
+                  <span v-if="store.loading">↻ </span>{{ isRevisionRequested ? 'Resubmit for Review' : 'Save Changes' }}
                 </button>
                 <button type="button" @click="cancelEdit" class="btn-secondary text-xs">Cancel</button>
               </div>
@@ -102,10 +117,10 @@
                 <p class="text-xs uppercase tracking-wide mb-1" style="color:#444">Participating Colleagues</p>
                 <div v-if="project.participants?.length" class="space-y-2">
                   <div
-                    v-for="participant in project.participants"
-                    :key="participant.id"
-                    class="rounded-md px-3 py-2"
-                    style="background:#111;border:1px solid #222"
+                      v-for="participant in project.participants"
+                      :key="participant.id"
+                      class="rounded-md px-3 py-2"
+                      style="background:#111;border:1px solid #222"
                   >
                     <p class="text-sm text-white">{{ participant.name }}</p>
                     <p class="text-xs font-mono" style="color:#22c55e">{{ participant.studentIndex }}</p>
@@ -121,14 +136,16 @@
             <p class="text-xs font-medium tracking-widest uppercase mb-4" style="color:#555">Review History</p>
             <div class="space-y-4">
               <div
-                v-for="review in project.reviews"
-                :key="review.id"
-                class="pl-3 py-1"
-                :style="`border-left: 2px solid ${reviewColor(review.status)}`"
+                  v-for="review in project.reviews"
+                  :key="review.id"
+                  class="pl-3 py-1"
+                  :style="`border-left: 2px solid ${reviewColor(review.status)}`"
               >
                 <div class="flex items-center gap-2 mb-1">
-                  <StatusBadge :status="review.status" />
-                  <span class="text-xs" style="color:#444">{{ review.professorName }} · {{ formatDate(review.reviewedAt) }}</span>
+                  <StatusBadge :status="review.status"/>
+                  <span class="text-xs" style="color:#444">{{ review.professorName }} · {{
+                      formatDate(review.reviewedAt)
+                    }}</span>
                 </div>
                 <p v-if="review.comment" class="text-sm" style="color:#aaa">{{ review.comment }}</p>
                 <p v-else class="text-xs italic" style="color:#444">No comment.</p>
@@ -143,7 +160,7 @@
 
         <!-- Right -->
         <div>
-          <QrCodeCard :project="project" />
+          <QrCodeCard :project="project"/>
         </div>
       </div>
     </template>
@@ -151,10 +168,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useProjectStore } from '@/stores/projects'
-import { useToastStore } from '@/stores/toast'
+import {ref, computed, onMounted} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
+import {useProjectStore} from '@/stores/projects'
+import {useToastStore} from '@/stores/toast'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseSpinner from '@/components/common/BaseSpinner.vue'
 import QrCodeCard from '@/components/common/QrCodeCard.vue'
@@ -164,15 +181,18 @@ const router = useRouter()
 const store = useProjectStore()
 const toast = useToastStore()
 const project = computed(() => store.currentProject)
+const isRevisionRequested = computed(() =>
+    project.value?.status === 'REVISION_REQUESTED'
+)
 
 const editing = ref(false)
-const editForm = ref({ title: '', description: '', preferredProfessorId: '', participantStudentIndexes: '' })
+const editForm = ref({title: '', description: '', preferredProfessorId: '', participantStudentIndexes: ''})
 
 const showDeleteConfirm = ref(false)
 
 const canEdit = computed(() =>
-  project.value &&
-  ['PENDING', 'REVISION_REQUESTED'].includes(project.value.status)
+    project.value &&
+    ['PENDING', 'REVISION_REQUESTED'].includes(project.value.status)
 )
 
 onMounted(async () => {
@@ -207,6 +227,7 @@ async function handleEdit() {
   }
 
   try {
+    const wasRevisionRequested = isRevisionRequested.value
     await store.editProject(route.params.id, {
       title: editForm.value.title,
       description: editForm.value.description,
@@ -214,7 +235,7 @@ async function handleEdit() {
       participantStudentIndexes: parsedParticipantIndexes
     })
     editing.value = false
-    toast.success('Project updated successfully')
+    toast.success(wasRevisionRequested ? 'Project resubmitted for review' : 'Project updated successfully')
   } catch (e) {
     toast.error(store.error || 'Failed to save changes')
   }
@@ -236,7 +257,7 @@ async function handleDelete() {
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})
 }
 
 function participantIndexesAsText(participants = []) {
@@ -245,13 +266,13 @@ function participantIndexesAsText(participants = []) {
 
 function parseParticipantIndexes(rawValue) {
   return rawValue
-    .split(/[\n,]/)
-    .map(value => value.trim())
-    .filter(Boolean)
-    .filter((value, index, list) => list.indexOf(value) === index)
+      .split(/[\n,]/)
+      .map(value => value.trim())
+      .filter(Boolean)
+      .filter((value, index, list) => list.indexOf(value) === index)
 }
 
 function reviewColor(status) {
-  return { APPROVED: '#22c55e', DECLINED: '#f87171', REVISION_REQUESTED: '#60a5fa', PENDING: '#f59e0b' }[status] || '#333'
+  return {APPROVED: '#22c55e', DECLINED: '#f87171', REVISION_REQUESTED: '#60a5fa', PENDING: '#f59e0b'}[status] || '#333'
 }
 </script>

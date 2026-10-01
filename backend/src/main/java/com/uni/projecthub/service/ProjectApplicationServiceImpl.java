@@ -112,8 +112,12 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
         }
 
         applyProjectDetails(project, request, student);
-        projectRepository.save(project);
 
+        if (project.getStatus() == ProjectStatus.REVISION_REQUESTED) {
+            project.setStatus(ProjectStatus.PENDING);
+        }
+
+        projectRepository.save(project);
         return toResponse(project);
     }
 
