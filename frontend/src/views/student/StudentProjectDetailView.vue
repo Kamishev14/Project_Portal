@@ -12,7 +12,6 @@
         </div>
         <div class="flex items-start justify-between gap-4">
           <h1 class="text-2xl font-bold tracking-tight text-white">{{ project.title }}</h1>
-          <!-- Edit/Delete — only shown for editable statuses -->
           <div v-if="canEdit" class="flex gap-2 shrink-0">
             <button @click="startEdit" class="btn-secondary text-xs">Edit</button>
             <button @click="confirmDelete" class="btn-danger text-xs">Delete</button>
@@ -71,9 +70,6 @@
                   rows="3"
                   placeholder="Enter 6-digit student indexes separated by commas or new lines"
                 ></textarea>
-              </div>
-              <div v-if="editError" class="px-3 py-2 rounded text-sm" style="background:#1a0000;color:#f87171;border:1px solid #3a0000">
-                {{ editError }}
               </div>
               <div class="flex gap-2">
                 <button type="submit" class="btn-primary text-xs" :disabled="store.loading">
@@ -158,24 +154,22 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/projects'
+import { useToastStore } from '@/stores/toast'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseSpinner from '@/components/common/BaseSpinner.vue'
 import QrCodeCard from '@/components/common/QrCodeCard.vue'
 
-const route   = useRoute()
-const router  = useRouter()
-const store   = useProjectStore()
+const route = useRoute()
+const router = useRouter()
+const store = useProjectStore()
+const toast = useToastStore()
 const project = computed(() => store.currentProject)
 
-// Edit state
-const editing   = ref(false)
-const editForm  = ref({ title: '', description: '', preferredProfessorId: '', participantStudentIndexes: '' })
-const editError = ref('')
+const editing = ref(false)
+const editForm = ref({ title: '', description: '', preferredProfessorId: '', participantStudentIndexes: '' })
 
-// Delete state
 const showDeleteConfirm = ref(false)
 
-// Can only edit/delete if pending or revision requested
 const canEdit = computed(() =>
   project.value &&
   ['PENDING', 'REVISION_REQUESTED'].includes(project.value.status)
@@ -197,22 +191,18 @@ function startEdit() {
     preferredProfessorId: project.value.preferredProfessor?.id || '',
     participantStudentIndexes: participantIndexesAsText(project.value.participants)
   }
-  editError.value = ''
   editing.value = true
 }
 
 function cancelEdit() {
   editing.value = false
-  editError.value = ''
 }
 
 async function handleEdit() {
-  editError.value = ''
-
   const parsedParticipantIndexes = parseParticipantIndexes(editForm.value.participantStudentIndexes)
   const invalidParticipant = parsedParticipantIndexes.find(index => !/^\d{6}$/.test(index))
   if (invalidParticipant) {
-    editError.value = `Participant index must be exactly 6 digits: ${invalidParticipant}`
+    toast.error(`Participant index must be exactly 6 digits: ${invalidParticipant}`)
     return
   }
 
@@ -224,8 +214,9 @@ async function handleEdit() {
       participantStudentIndexes: parsedParticipantIndexes
     })
     editing.value = false
+    toast.success('Project updated successfully')
   } catch (e) {
-    editError.value = store.error || 'Failed to save changes'
+    toast.error(store.error || 'Failed to save changes')
   }
 }
 
@@ -236,9 +227,11 @@ function confirmDelete() {
 async function handleDelete() {
   try {
     await store.deleteProject(route.params.id)
+    toast.success('Project deleted')
     router.push('/student/projects')
   } catch (e) {
     showDeleteConfirm.value = false
+    toast.error('Failed to delete project')
   }
 }
 

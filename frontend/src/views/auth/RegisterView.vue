@@ -52,10 +52,6 @@
           <input v-model="form.password" type="password" class="input" placeholder="Min. 6 characters" required minlength="6" />
         </div>
 
-        <div v-if="errorMsg" class="px-3 py-2.5 rounded-md text-sm" style="background:#1a0000;color:#f87171;border:1px solid #3a0000">
-          {{ errorMsg }}
-        </div>
-
         <button type="submit" class="btn-primary w-full mt-2" :disabled="loading || !canSubmit">
           <span v-if="loading" class="mr-2 opacity-70">↻</span>
           Create Account
@@ -74,14 +70,15 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
 
-const auth     = useAuthStore()
-const router   = useRouter()
-const form     = ref({ name: '', studentIndex: '', email: '', password: '' })
-const loading  = ref(false)
-const errorMsg = ref('')
+const auth = useAuthStore()
+const toast = useToastStore()
+const router = useRouter()
+const form = ref({ name: '', studentIndex: '', email: '', password: '' })
+const loading = ref(false)
 
-const isStudentEmail   = computed(() => form.value.email.toLowerCase().endsWith('@students.finki.ukim.mk'))
+const isStudentEmail = computed(() => form.value.email.toLowerCase().endsWith('@students.finki.ukim.mk'))
 const isProfessorEmail = computed(() =>
   form.value.email.toLowerCase().endsWith('@finki.ukim.mk') &&
   !form.value.email.toLowerCase().endsWith('@students.finki.ukim.mk')
@@ -90,9 +87,7 @@ const isValidDomain = computed(() => isStudentEmail.value || isProfessorEmail.va
 
 const canSubmit = computed(() => {
   if (!isValidDomain.value) return false
-  // Students need a full 6-digit index; professors don't need one at all
-  if (isStudentEmail.value && form.value.studentIndex.length !== 6) return false
-  return true
+  return isStudentEmail.value ? form.value.studentIndex.length === 6 : true
 })
 
 const enrollmentYear = computed(() => {
@@ -102,16 +97,17 @@ const enrollmentYear = computed(() => {
 })
 
 async function handleRegister() {
-  loading.value  = true
-  errorMsg.value = ''
+  loading.value = true
   try {
     await auth.register(form.value)
+    toast.success('Account created successfully')
     router.push(auth.isProfessor ? '/professor' : '/student')
   } catch (e) {
     const data = e.response?.data
-    errorMsg.value = typeof data === 'object'
+    const message = typeof data === 'object'
       ? Object.values(data).join(', ')
       : data?.message || 'Registration failed'
+    toast.error(message)
   } finally {
     loading.value = false
   }

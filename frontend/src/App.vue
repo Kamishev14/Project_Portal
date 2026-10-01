@@ -1,7 +1,11 @@
-  <template>
+<template>
+  <div>
     <RouterView />
-  </template>
+    <ToastContainer />
+  </div>
+</template>
 
-  <script setup>
-  import { RouterView } from 'vue-router'
-  </script>
+<script setup>
+import { RouterView } from 'vue-router'
+import ToastContainer from '@/components/common/ToastContainer.vue'
+</script>

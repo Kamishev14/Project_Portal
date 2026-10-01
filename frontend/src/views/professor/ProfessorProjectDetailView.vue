@@ -95,10 +95,6 @@
                 ></textarea>
               </div>
 
-              <div v-if="errorMsg" class="px-3 py-2.5 rounded-md text-sm" style="background:#1a0000;color:#f87171;border:1px solid #3a0000">
-                {{ errorMsg }}
-              </div>
-
               <button type="submit" class="btn-primary" :disabled="!form.status || store.loading">
                 <span v-if="store.loading" class="mr-2 opacity-70">↻</span>
                 Submit Review
@@ -148,34 +144,36 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/projects'
+import { useToastStore } from '@/stores/toast'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseSpinner from '@/components/common/BaseSpinner.vue'
 import QrCodeCard from '@/components/common/QrCodeCard.vue'
 
-const route         = useRoute()
-const router        = useRouter()
-const store         = useProjectStore()
-const project       = computed(() => store.currentProject)
+const route = useRoute()
+const router = useRouter()
+const store = useProjectStore()
+const toast = useToastStore()
+const project = computed(() => store.currentProject)
 const reviewSuccess = ref(false)
-const errorMsg      = ref('')
-const form          = ref({ status: '', comment: '' })
+const form = ref({ status: '', comment: '' })
 
 const decisionOptions = [
-  { value: 'APPROVED',           label: '✅ Approve',         activeStyle: 'background:#052e16;color:#22c55e;border-color:#14532d' },
+  { value: 'APPROVED', label: '✅ Approve', activeStyle: 'background:#052e16;color:#22c55e;border-color:#14532d' },
   { value: 'REVISION_REQUESTED', label: '🔄 Request Revision', activeStyle: 'background:#0c1a3a;color:#60a5fa;border-color:#1e3a5f' },
-  { value: 'DECLINED',           label: '❌ Decline',          activeStyle: 'background:#2d0000;color:#f87171;border-color:#5a0000' }
+  { value: 'DECLINED', label: '❌ Decline', activeStyle: 'background:#2d0000;color:#f87171;border-color:#5a0000' }
 ]
 
 onMounted(() => store.fetchProjectById(route.params.id))
 
 async function handleReview() {
-  errorMsg.value = ''; reviewSuccess.value = false
+  reviewSuccess.value = false
   try {
     await store.reviewProject(route.params.id, form.value)
     reviewSuccess.value = true
+    toast.success('Review submitted successfully')
     form.value = { status: '', comment: '' }
   } catch (e) {
-    errorMsg.value = store.error || 'Failed to submit review'
+    toast.error(store.error || 'Failed to submit review')
   }
 }
 

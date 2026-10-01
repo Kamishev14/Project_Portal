@@ -80,10 +80,6 @@
           </p>
         </div>
 
-        <div v-if="errorMsg" class="px-3 py-2.5 rounded-md text-sm" style="background:#1a0000;color:#f87171;border:1px solid #3a0000">
-          {{ errorMsg }}
-        </div>
-
         <div class="flex gap-3">
           <RouterLink to="/student/projects" class="btn-secondary">Cancel</RouterLink>
           <button type="submit" class="btn-primary" :disabled="store.loading">
@@ -99,13 +95,14 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useProjectStore } from '@/stores/projects'
+import { useToastStore } from '@/stores/toast'
 import QrCodeCard from '@/components/common/QrCodeCard.vue'
 
-const store            = useProjectStore()
-const form             = ref({ title: '', description: '', preferredProfessorId: '', participantStudentIndexes: '' })
-const submitted        = ref(false)
+const store = useProjectStore()
+const toast = useToastStore()
+const form = ref({ title: '', description: '', preferredProfessorId: '', participantStudentIndexes: '' })
+const submitted = ref(false)
 const submittedProject = ref(null)
-const errorMsg         = ref('')
 
 const parsedParticipantIndexes = computed(() => parseParticipantIndexes(form.value.participantStudentIndexes))
 
@@ -113,16 +110,14 @@ onMounted(async () => {
   try {
     await store.fetchProfessorOptions()
   } catch (e) {
-    errorMsg.value = store.error || 'Failed to load professors'
+    toast.error('Failed to load professors')
   }
 })
 
 async function handleSubmit() {
-  errorMsg.value = ''
-
   const invalidParticipant = parsedParticipantIndexes.value.find(index => !/^\d{6}$/.test(index))
   if (invalidParticipant) {
-    errorMsg.value = `Participant index must be exactly 6 digits: ${invalidParticipant}`
+    toast.error(`Participant index must be exactly 6 digits: ${invalidParticipant}`)
     return
   }
 
@@ -133,9 +128,10 @@ async function handleSubmit() {
       preferredProfessorId: form.value.preferredProfessorId || null,
       participantStudentIndexes: parsedParticipantIndexes.value
     })
+    toast.success('Project submitted successfully')
     submitted.value = true
   } catch (e) {
-    errorMsg.value = store.error || 'Submission failed. Please try again.'
+    toast.error(store.error || 'Submission failed. Please try again.')
   }
 }
 

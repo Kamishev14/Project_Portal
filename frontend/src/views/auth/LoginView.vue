@@ -18,10 +18,6 @@
           <input v-model="form.password" type="password" class="input" placeholder="••••••••" required />
         </div>
 
-        <div v-if="errorMsg" class="px-3 py-2.5 rounded-md text-sm" style="background:#1a0000;color:#f87171;border:1px solid #3a0000">
-          {{ errorMsg }}
-        </div>
-
         <button type="submit" class="btn-primary w-full mt-2" :disabled="loading">
           <span v-if="loading" class="mr-2 opacity-70">↻</span>
           Sign in
@@ -40,21 +36,22 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
 
-const auth     = useAuthStore()
-const router   = useRouter()
-const form     = ref({ email: '', password: '' })
-const loading  = ref(false)
-const errorMsg = ref('')
+const auth   = useAuthStore()
+const toast   = useToastStore()
+const router = useRouter()
+const form   = ref({ email: '', password: '' })
+const loading = ref(false)
 
 async function handleLogin() {
-  loading.value  = true
-  errorMsg.value = ''
+  loading.value = true
   try {
     await auth.login(form.value)
+    toast.success('Logged in successfully')
     router.push(auth.isProfessor ? '/professor' : '/student')
   } catch (e) {
-    errorMsg.value = e.response?.data?.message || 'Invalid email or password'
+    toast.error(e.response?.data?.message || 'Invalid email or password')
   } finally {
     loading.value = false
   }
