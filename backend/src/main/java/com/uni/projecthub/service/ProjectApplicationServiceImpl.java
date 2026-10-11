@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +44,7 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
     private final UserRepository userRepository;
     private final ProjectDomainService domainService;
     private final ApplicationEventPublisher eventPublisher;
+    private final SettingsService settingsService;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -59,6 +61,12 @@ public class ProjectApplicationServiceImpl implements ProjectApplicationService 
     @Transactional
     public ProjectResponse submitProject(ProjectRequest request, String studentEmail) {
         User student = findUserByEmail(studentEmail);
+
+        // Check deadline
+        var settings = settingsService.getSubmissionSettings();
+        if (settings.getDeadline() != null && LocalDateTime.now().isAfter(settings.getDeadline())) {
+            throw new IllegalArgumentException("Submission deadline has passed");
+        }
 
         Project project = Project.builder()
                 .status(ProjectStatus.PENDING)

@@ -5,6 +5,44 @@
     <BaseSpinner v-if="!stats" />
 
     <template v-else>
+      <!-- Settings -->
+      <div class="card mb-10">
+        <p class="text-xs font-medium tracking-widest uppercase mb-4" style="color:#555">Submission Settings</p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium mb-1.5 tracking-wide uppercase" style="color:#777">Submission Deadline</label>
+            <div class="flex gap-2">
+              <input
+                v-model="deadlineForm"
+                type="datetime-local"
+                class="input flex-1"
+              />
+              <button
+                @click="saveDeadline"
+                class="btn-primary text-xs"
+                :disabled="store.loading"
+              >
+                <span v-if="store.loading">↻ </span>Save
+              </button>
+              <button
+                v-if="store.submissionDeadline"
+                @click="clearDeadline"
+                class="btn-secondary text-xs"
+                :disabled="store.loading"
+              >
+                Clear
+              </button>
+            </div>
+            <p v-if="store.submissionDeadline" class="text-xs mt-2" style="color:#22c55e">
+              Current: {{ formatDateTime(store.submissionDeadline) }}
+            </p>
+            <p v-else class="text-xs mt-2 italic" style="color:#555">
+              No deadline set. Students can submit anytime.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <!-- Stats -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
         <div class="stat-card">
@@ -67,23 +105,83 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useProjectStore } from '@/stores/projects'
+import { useToastStore } from '@/stores/toast'
 import BaseSpinner from '@/components/common/BaseSpinner.vue'
 
 const store = useProjectStore()
+const toast = useToastStore()
+const deadlineForm = ref('')
+
 const stats = computed(() => store.stats)
 const pendingProjects = computed(() =>
   store.allProjects.filter(p => p.status === 'PENDING').slice(0, 5)
 )
 
+// Sync deadline from store to form
+watch(() => store.submissionDeadline, (newDeadline) => {
+  if (newDeadline) {
+    deadlineForm.value = formatDateTimeForInput(newDeadline)
+  } else {
+    deadlineForm.value = ''
+  }
+})
+
 onMounted(async () => {
   await store.fetchStats()
   await store.fetchAllProjects({ status: 'PENDING', size: 5 })
+  await store.fetchSubmissionDeadline()
 })
+
+async function saveDeadline() {
+  if (!deadlineForm.value) {
+    toast.error('Please select a deadline')
+    return
+  }
+  try {
+    const deadline = new Date(deadlineForm.value).toISOString()
+    await store.updateSubmissionDeadline(deadline)
+    toast.success('Deadline updated successfully')
+  } catch (e) {
+    toast.error('Failed to update deadline')
+  }
+}
+
+async function clearDeadline() {
+  try {
+    await store.updateSubmissionDeadline(null)
+    deadlineForm.value = ''
+    toast.success('Deadline cleared')
+  } catch (e) {
+    toast.error('Failed to clear deadline')
+  }
+}
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function formatDateTime(date) {
+  if (!date) return ''
+  return new Date(date).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function formatDateTimeForInput(date) {
+  if (!date) return ''
+  const d = new Date(date)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 </script>
 

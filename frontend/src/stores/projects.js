@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { projectApi } from '@/api'
+import { projectApi, settingsApi } from '@/api'
 
 export const useProjectStore = defineStore('projects', () => {
   const myProjects     = ref([])
@@ -8,6 +8,7 @@ export const useProjectStore = defineStore('projects', () => {
   const currentProject = ref(null)
   const stats          = ref(null)
   const professorOptions = ref([])
+  const submissionDeadline = ref(null)
   const pagination     = ref({ page: 0, size: 10, totalPages: 0, totalElements: 0 })
   const loading        = ref(false)
   const professorOptionsLoading = ref(false)
@@ -169,10 +170,35 @@ export const useProjectStore = defineStore('projects', () => {
     stats.value = res.data
   }
 
+  async function fetchSubmissionDeadline() {
+    try {
+      const res = await settingsApi.getSubmissionDeadline()
+      submissionDeadline.value = res.data.deadline ? new Date(res.data.deadline) : null
+    } catch (e) {
+      // Gracefully handle error
+      submissionDeadline.value = null
+    }
+  }
+
+  async function updateSubmissionDeadline(deadline) {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await settingsApi.updateSubmissionDeadline({ deadline })
+      submissionDeadline.value = res.data.deadline ? new Date(res.data.deadline) : null
+      return res.data
+    } catch (e) {
+      error.value = parseApiError(e, 'Failed to update deadline')
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
-    myProjects, allProjects, currentProject, stats, professorOptions, pagination,
+    myProjects, allProjects, currentProject, stats, professorOptions, submissionDeadline, pagination,
     loading, professorOptionsLoading, error,
     submitProject, fetchMyProjects, fetchMyProject, editProject, deleteProject, fetchProfessorOptions,
-    fetchAllProjects, fetchProjectById, reviewProject, fetchStats
+    fetchAllProjects, fetchProjectById, reviewProject, fetchStats, fetchSubmissionDeadline, updateSubmissionDeadline
   }
 })

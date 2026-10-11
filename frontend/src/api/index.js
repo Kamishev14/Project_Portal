@@ -24,3 +24,9 @@ export const projectApi = {
   // Shared
   getQrUrl:          (id)         => `/api/projects/${id}/qr`
 }
+
+export const settingsApi = {
+  getSubmissionDeadline: ()       => api.get('/settings/submission-deadline'),
+  updateSubmissionDeadline: (data) => api.put('/settings/submission-deadline', data)
+}
+

@@ -2,8 +2,20 @@
   <div class="max-w-2xl">
     <RouterLink to="/student/projects" class="text-xs hover:underline" style="color:#555">← Back</RouterLink>
 
+    <!-- Deadline closed -->
+    <div v-if="isDeadlinePassed" class="mt-6 card text-center space-y-4" style="background:#1a0000;border-color:#3a0000">
+      <p class="text-4xl">🔒</p>
+      <h2 class="text-xl font-bold text-white">Submission Closed</h2>
+      <p class="text-sm" style="color:#aaa">
+        The submission deadline has passed. No new projects can be submitted at this time.
+      </p>
+      <div class="flex gap-3 justify-center pt-2">
+        <RouterLink to="/student/projects" class="btn-secondary">View My Projects</RouterLink>
+      </div>
+    </div>
+
     <!-- Success -->
-    <div v-if="submitted" class="mt-6 card text-center space-y-4">
+    <div v-else-if="submitted" class="mt-6 card text-center space-y-4">
       <p class="text-4xl">🎉</p>
       <h2 class="text-xl font-bold text-white">Submitted!</h2>
       <p class="text-sm" style="color:#666">Your project is in the review queue.</p>
@@ -18,6 +30,11 @@
     <template v-else>
       <h1 class="text-2xl font-bold tracking-tight text-white mt-4">Submit a Project Idea</h1>
       <p class="text-sm mt-1 mb-8" style="color:#555">Describe your idea clearly — your professor will review it.</p>
+
+      <div v-if="submissionDeadline" class="card mb-6" style="background:#1a1a1a;border-color:#2a2a2a">
+        <p class="text-xs uppercase tracking-wide mb-1" style="color:#60a5fa">Deadline</p>
+        <p class="text-sm text-white">{{ formatDateTime(submissionDeadline) }}</p>
+      </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-5">
         <div>
@@ -82,7 +99,7 @@
 
         <div class="flex gap-3">
           <RouterLink to="/student/projects" class="btn-secondary">Cancel</RouterLink>
-          <button type="submit" class="btn-primary" :disabled="store.loading">
+          <button type="submit" class="btn-primary" :disabled="store.loading || isDeadlinePassed">
             <span v-if="store.loading" class="mr-2 opacity-70">↻</span>
             Submit Idea
           </button>
@@ -106,11 +123,19 @@ const submittedProject = ref(null)
 
 const parsedParticipantIndexes = computed(() => parseParticipantIndexes(form.value.participantStudentIndexes))
 
+const submissionDeadline = computed(() => store.submissionDeadline)
+
+const isDeadlinePassed = computed(() => {
+  if (!submissionDeadline.value) return false
+  return new Date() > submissionDeadline.value
+})
+
 onMounted(async () => {
   try {
     await store.fetchProfessorOptions()
+    await store.fetchSubmissionDeadline()
   } catch (e) {
-    toast.error('Failed to load professors')
+    toast.error('Failed to load setup information')
   }
 })
 
@@ -141,5 +166,16 @@ function parseParticipantIndexes(rawValue) {
     .map(value => value.trim())
     .filter(Boolean)
     .filter((value, index, list) => list.indexOf(value) === index)
+}
+
+function formatDateTime(date) {
+  if (!date) return ''
+  return new Date(date).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 </script>
